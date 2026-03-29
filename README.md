@@ -332,7 +332,7 @@ If you use CausalTarget in your research, please cite:
 ```bibtex
 @software{causaltarget2026,
   title  = {CausalTarget: Causal Drug Target Discovery via Do-Calculus},
-  author = {NeoForge Bio-AI Platform},
+  author = {Njeri, Kelyn Paul},
   year   = {2026},
   url    = {https://github.com/NeoForge/CausalTarget}
 }

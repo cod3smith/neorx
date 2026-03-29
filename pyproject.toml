@@ -10,7 +10,7 @@ readme = "README.md"
 license = "MIT"
 requires-python = ">=3.13"
 authors = [
-    { name = "NeoForge Bio-AI Platform" },
+    { name = "Kelyn Paul Njeri" },
 ]
 keywords = [
     "causal-inference",
