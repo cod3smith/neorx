@@ -1,15 +1,15 @@
-# 🧬 CausalTarget — Causal Drug Target Discovery
+# 🧬 NeoRx — Causal Drug Target Discovery
 
-> *"Correlation is not causation — CausalTarget knows the difference."*
+> *"Correlation is not causation — NeoRx knows the difference."*
 
 [![Python 3.13+](https://img.shields.io/badge/python-3.13%2B-blue.svg)](https://python.org)
-[![Tests](https://img.shields.io/badge/tests-108%20passing-brightgreen.svg)]()
+[![Tests](https://img.shields.io/badge/tests-371%20passing-brightgreen.svg)]()
 [![License](https://img.shields.io/badge/license-MIT-green.svg)]()
 
-**CausalTarget** is an AI-driven drug target discovery pipeline that applies
+**NeoRx** is an AI-driven drug target discovery pipeline that applies
 **Pearl's causal inference framework** to distinguish genuine causal drug
 targets from correlational bystanders.  Unlike conventional association-based
-pipelines, CausalTarget asks:
+pipelines, NeoRx asks:
 
 > *"If we intervene on this protein (inhibit or activate it with a drug),
 > does it causally affect the disease outcome?"*
@@ -25,7 +25,7 @@ Conversely, **CCR5** is the HIV-1 co-receptor.  A loss-of-function mutation
 (CCR5-Δ32) confers near-complete resistance.  Maraviroc, which blocks CCR5,
 is an approved antiretroviral.  CCR5 is a **causal** target.
 
-CausalTarget distinguishes these two cases automatically.
+NeoRx distinguishes these two cases automatically.
 
 ## Pipeline Architecture
 
@@ -78,20 +78,45 @@ CausalTarget distinguishes these two cases automatically.
 6. **Report** — Interactive HTML report with causal knowledge graph
    visualisation, target reasoning, and ranked candidate table.
 
+### RL-Driven Mode (CausalBioRL)
+
+In addition to the linear pipeline, NeoRx includes an
+**RL-driven drug discovery mode** where a causal reinforcement
+learning agent iteratively explores the target–molecule space:
+
+```
+┌─ DrugDiscoveryEnv (Gymnasium) ─────────────────────────┐
+│  R-GCN encodes disease graph → 128-D state embedding   │
+│  UCB1 selects target (Level 1)                         │
+│  CEM navigates GenMol latent space (Level 2)           │
+│  SurrogateDockingModel → fast binding score (~1ms)     │
+│  MolScreen → QED / SA / filters                        │
+│  MirrorFold → stability assessment                     │
+│  AdaptiveRewardLearner → multi-objective reward         │
+└────────────────────────────────────────────────────────┘
+```
+
+```python
+from neorx import run_rl_pipeline
+
+# RL agent iteratively discovers molecules
+result = run_rl_pipeline("HIV", n_episodes=20, top_n_targets=5)
+```
+
 ## Installation
 
 ```bash
 # From PyPI
-pip install causaltarget
+pip install neorx
 
 # From source with uv
-git clone https://github.com/NeoForge/CausalTarget.git
-cd CausalTarget
+git clone https://github.com/NeoForge/NeoRx.git
+cd NeoRx
 uv sync
 
 # From source with pip
-git clone https://github.com/NeoForge/CausalTarget.git
-cd CausalTarget
+git clone https://github.com/NeoForge/NeoRx.git
+cd NeoRx
 pip install -e .
 ```
 
@@ -119,25 +144,25 @@ docker compose up -d
 
 ```bash
 # Full pipeline for HIV
-causaltarget run HIV --top-n 5
+neorx run HIV --top-n 5
 
 # Build the causal knowledge graph only
-causaltarget graph "Type 2 Diabetes"
+neorx graph "Type 2 Diabetes"
 
 # Identify causal targets (no molecule generation)
-causaltarget identify "Alzheimer Disease" --top-n 10
+neorx identify "Alzheimer Disease" --top-n 10
 
 # Export graph to Cytoscape format
-causaltarget graph HIV --export cytoscape
+neorx graph HIV --export cytoscape
 
 # Start API server
-causaltarget serve --port 8000
+neorx serve --port 8000
 ```
 
 ### Python API
 
 ```python
-from causaltarget import (
+from neorx import (
     build_disease_graph,
     identify_causal_targets,
     run_pipeline,
@@ -192,7 +217,7 @@ All clients include curated mock fallback data for offline use and testing.
 
 ### Causal Inference Approach
 
-CausalTarget uses **multi-source evidence triangulation** rather than
+NeoRx uses **multi-source evidence triangulation** rather than
 fabricated synthetic data:
 
 1. **Graph-Topological Causal Analysis** — Path strength from treatment
@@ -223,9 +248,9 @@ fabricated synthetic data:
 ## Graph Persistence & Export
 
 ```python
-from causaltarget import save_graph, load_graph
+from neorx import save_graph, load_graph
 
-# Save to JSON (default: ~/.causaltarget/graphs/)
+# Save to JSON (default: ~/.neorx/graphs/)
 path = save_graph(graph)
 
 # Export for Cytoscape
@@ -244,40 +269,45 @@ for querying and sharing across sessions.
 ## Project Structure
 
 ```
-CausalTarget/
+NeoRx/
 ├── main.py                     # Entry point
 ├── pyproject.toml              # Dependencies, build config & CLI scripts
 ├── LICENSE                     # MIT License
+├── CONTRIBUTING.md             # Contributor guide
+├── CODE_OF_CONDUCT.md          # Community standards
+├── SECURITY.md                 # Vulnerability reporting
 ├── docker-compose.yml          # Redis + PostgreSQL + API
 ├── Dockerfile
 ├── init/init.sql               # Database schema
 │
-├── causaltarget/               # Public re-export package (pip install)
-│   └── __init__.py             # `from causaltarget import run_pipeline`
+├── neorx/               # Public re-export package (pip install)
+│   └── __init__.py             # `from neorx import run_pipeline`
 │
-├── modules/causal_target/
+├── modules/neorx/      # Orchestration module
 │   ├── models.py               # Pydantic data models
 │   ├── graph_builder.py        # Parallel multi-source graph assembly
 │   ├── identifier.py           # Causal inference (d-separation, triangulation)
-│   ├── scorer.py               # 6D composite scoring (configurable weights)
-│   ├── pipeline.py             # End-to-end orchestration
+│   ├── scorer.py               # 6D composite scoring
+│   ├── pipeline.py             # Linear + RL-driven orchestration
 │   ├── report.py               # Interactive HTML reports
+│   ├── classifier.py           # Target type classification
+│   ├── validator.py            # Known-target validation
+│   ├── tissue_filter.py        # Tissue expression filtering
+│   ├── counterfactual.py       # Counterfactual validation + BioRL bridge
+│   ├── literature_validator.py # Literature evidence lookup
 │   ├── api.py                  # FastAPI REST service
 │   ├── cache.py                # File/Redis caching layer
 │   ├── persistence.py          # Graph save/load/export
 │   ├── admet.py                # Multi-rule ADMET prediction
 │   ├── __main__.py             # Typer CLI
-│   ├── data_sources/
-│   │   ├── monarch.py          # Monarch Initiative client
-│   │   ├── open_targets.py     # Open Targets GraphQL
-│   │   ├── kegg.py             # KEGG REST
-│   │   ├── reactome.py         # Reactome Content Service
-│   │   ├── string_db.py        # STRING batch PPI queries
-│   │   ├── uniprot.py          # UniProt metadata enrichment
-│   │   └── pdb.py              # RCSB PDB structure search
-│   ├── templates/
-│   │   └── report.html         # Jinja2 report template
-│   └── tests/                  # 108 tests (pytest)
+│   ├── data_sources/           # 7 biomedical database clients
+│   └── tests/
+│
+├── modules/causalbiorl/        # Causal reinforcement learning
+│   ├── agents/                 # CausalAgent (hierarchical planning)
+│   ├── envs/                   # Gymnasium envs (toy + DrugDiscovery-v0)
+│   ├── causal/                 # SCM, planner, graph encoder, reward learner
+│   └── tests/
 │
 ├── modules/genmol/             # Molecular generation (VAE)
 ├── modules/molscreen/          # Drug-likeness screening
@@ -288,11 +318,18 @@ CausalTarget/
 ## Testing
 
 ```bash
-# Run all causal_target tests
-uv run python -m pytest modules/causal_target/tests/ -v
+# Run all tests (371 tests)
+uv run python -m pytest modules/ -q
+
+# Run a specific module's tests
+uv run python -m pytest modules/neorx/tests/ -v
 
 # Run with coverage
-uv run python -m pytest modules/causal_target/tests/ --cov=modules.causal_target
+uv run python -m pytest modules/ --cov=modules --cov-report=term-missing
+
+# Lint
+uv run ruff check .
+uv run ruff format --check .
 ```
 
 ## Configuration
@@ -301,8 +338,8 @@ uv run python -m pytest modules/causal_target/tests/ --cov=modules.causal_target
 
 | Variable                       | Default     | Description                      |
 |--------------------------------|-------------|----------------------------------|
-| `CAUSALTARGET_CACHE_BACKEND`   | `file`      | `file` or `redis`                |
-| `CAUSALTARGET_SEED`            | `42`        | RNG seed for reproducibility     |
+| `NEORX_CACHE_BACKEND`   | `file`      | `file` or `redis`                |
+| `NEORX_SEED`            | `42`        | RNG seed for reproducibility     |
 | `REDIS_URL`                    | —           | Redis connection URL             |
 | `DATABASE_URL`                 | —           | PostgreSQL connection URL        |
 
@@ -312,7 +349,7 @@ uv run python -m pytest modules/causal_target/tests/ --cov=modules.causal_target
 Customise via environment or the Python API:
 
 ```python
-from causaltarget import score_candidate
+from neorx import score_candidate
 
 # Weights are configurable per-call
 custom_weights = {
@@ -327,14 +364,14 @@ custom_weights = {
 
 ## Citation
 
-If you use CausalTarget in your research, please cite:
+If you use NeoRx in your research, please cite:
 
 ```bibtex
-@software{causaltarget2026,
-  title  = {CausalTarget: Causal Drug Target Discovery via Do-Calculus},
+@software{neorx2026,
+  title  = {NeoRx: Causal Drug Target Discovery via Do-Calculus},
   author = {Njeri, Kelyn Paul},
   year   = {2026},
-  url    = {https://github.com/NeoForge/CausalTarget}
+  url    = {https://github.com/NeoForge/NeoRx}
 }
 ```
 

@@ -3,7 +3,7 @@ requires = ["hatchling"]
 build-backend = "hatchling.build"
 
 [project]
-name = "causaltarget"
+name = "neorx"
 version = "0.1.0"
 description = "Causal drug target discovery via Pearl's do-calculus — distinguishes genuine causal targets from correlational bystanders"
 readme = "README.md"
@@ -71,11 +71,11 @@ dependencies = [
 ]
 
 [project.urls]
-Homepage = "https://github.com/NeoForge/CausalTarget"
-Documentation = "https://github.com/NeoForge/CausalTarget#readme"
-Repository = "https://github.com/NeoForge/CausalTarget"
-Issues = "https://github.com/NeoForge/CausalTarget/issues"
-Changelog = "https://github.com/NeoForge/CausalTarget/blob/main/CHANGELOG.md"
+Homepage = "https://github.com/NeoForge/NeoRx"
+Documentation = "https://github.com/NeoForge/NeoRx#readme"
+Repository = "https://github.com/NeoForge/NeoRx"
+Issues = "https://github.com/NeoForge/NeoRx/issues"
+Changelog = "https://github.com/NeoForge/NeoRx/blob/main/CHANGELOG.md"
 
 [project.optional-dependencies]
 docking = ["vina>=1.2"]
@@ -87,14 +87,14 @@ dockbot = "modules.dockbot.__main__:main"
 genmol = "modules.genmol.__main__:main"
 causalbiorl = "modules.causalbiorl.__main__:main"
 mirrorfold = "modules.mirrorfold.__main__:main"
-causaltarget = "modules.causal_target.__main__:main"
+neorx = "modules.neorx.__main__:main"
 
 [tool.hatch.build.targets.wheel]
-packages = ["causaltarget", "modules"]
+packages = ["neorx", "modules"]
 
 [tool.hatch.build.targets.sdist]
 include = [
-    "causaltarget/",
+    "neorx/",
     "modules/",
     "main.py",
     "README.md",
@@ -109,4 +109,51 @@ include = [
 [dependency-groups]
 dev = [
     "pytest>=9.0.2",
+    "pytest-cov>=6.0",
+    "pytest-timeout>=2.3",
+    "ruff>=0.9",
+    "mypy>=1.14",
 ]
+
+[tool.pytest.ini_options]
+testpaths = ["modules"]
+addopts = "-q --tb=short"
+filterwarnings = [
+    "ignore::DeprecationWarning:pkg_resources",
+    "ignore::UserWarning:chembl_webresource_client",
+]
+
+[tool.coverage.run]
+source = ["modules"]
+omit = [
+    "*/tests/*",
+    "*/__main__.py",
+    "*/templates/*",
+]
+
+[tool.coverage.report]
+show_missing = true
+skip_empty = true
+exclude_lines = [
+    "pragma: no cover",
+    "if __name__ == .__main__.",
+    "if TYPE_CHECKING:",
+    "raise NotImplementedError",
+]
+
+[tool.ruff]
+line-length = 100
+target-version = "py313"
+
+[tool.ruff.lint]
+select = ["E", "F", "W", "I", "UP", "B", "SIM"]
+ignore = ["E501", "B008", "B905", "SIM108"]
+
+[tool.ruff.lint.isort]
+known-first-party = ["modules", "neorx"]
+
+[tool.mypy]
+python_version = "3.13"
+warn_return_any = true
+warn_unused_configs = true
+ignore_missing_imports = true
