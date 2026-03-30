@@ -156,3 +156,178 @@ class CausalPlanner:
             total_reward += self.reward_fn(next_s, action)
             s = next_s
         return total_reward
+
+
+# -------------------------------------------------------------------- #
+#  Hierarchical Planner (Drug Discovery)                                #
+# -------------------------------------------------------------------- #
+
+
+class HierarchicalPlanner:
+    """Two-level planner for drug discovery environments.
+
+    Level 1: **Target selection** — discrete choice over identified
+    causal targets.  Uses upper confidence bound (UCB) on per-target
+    expected reward to balance exploration vs exploitation.
+
+    Level 2: **Molecule generation** — continuous delta-z vector in
+    GenMol’s latent space.  Uses CEM (Cross-Entropy Method) conditioned
+    on the chosen target’s embedding.
+
+    Parameters
+    ----------
+    scm : StructuralCausalModel | None
+        Fitted SCM for causal planning.  If ``None``, target selection
+        falls back to UCB without causal reasoning.
+    reward_fn : callable
+        ``(state, action) → float``.
+    n_targets : int
+        Number of available targets.
+    latent_dim : int
+        GenMol latent space dimension.
+    cem_samples : int
+        CEM samples per iteration.
+    cem_iterations : int
+        CEM refinement rounds.
+    cem_elite_frac : float
+        Fraction of top samples retained.
+    ucb_c : float
+        UCB exploration constant.
+    """
+
+    def __init__(
+        self,
+        scm: StructuralCausalModel | None = None,
+        reward_fn: Callable[[NDArray[np.floating], NDArray[np.floating]], float] | None = None,
+        n_targets: int = 5,
+        latent_dim: int = 128,
+        cem_samples: int = 200,
+        cem_iterations: int = 5,
+        cem_elite_frac: float = 0.1,
+        ucb_c: float = 2.0,
+    ) -> None:
+        self.scm = scm
+        self.reward_fn = reward_fn
+        self.n_targets = n_targets
+        self.latent_dim = latent_dim
+        self.cem_samples = cem_samples
+        self.cem_iterations = cem_iterations
+        self.cem_elite_frac = cem_elite_frac
+        self.ucb_c = ucb_c
+
+        # Per-target statistics for UCB
+        self._target_counts = np.zeros(n_targets, dtype=np.float64)
+        self._target_rewards = np.zeros(n_targets, dtype=np.float64)
+        self._total_steps = 0
+
+    def plan(
+        self,
+        state: NDArray[np.floating],
+        target_embeddings: NDArray[np.floating] | None = None,
+        rng: np.random.Generator | None = None,
+    ) -> NDArray[np.floating]:
+        """Select target + generate molecule (full hierarchical action).
+
+        Returns
+        -------
+        ndarray of shape ``(2 + latent_dim,)``
+            ``[target_selector, stop_signal, delta_z_0, …, delta_z_127]``
+        """
+        if rng is None:
+            rng = np.random.default_rng()
+
+        # Level 1: Select target via UCB
+        target_idx = self._select_target_ucb(rng)
+
+        # Level 2: Generate delta-z via CEM
+        delta_z = self._plan_molecule_cem(
+            state, target_idx, target_embeddings, rng,
+        )
+
+        # Compose hierarchical action
+        action = np.zeros(2 + self.latent_dim, dtype=np.float32)
+        # Map target index to continuous action in [-1, 1]
+        action[0] = (2.0 * target_idx / max(self.n_targets - 1, 1)) - 1.0
+        action[1] = -1.0  # no stop signal
+        action[2:] = delta_z
+
+        return action
+
+    def update(
+        self,
+        target_idx: int,
+        reward: float,
+    ) -> None:
+        """Update target statistics after observing a reward."""
+        if 0 <= target_idx < self.n_targets:
+            self._target_counts[target_idx] += 1
+            self._target_rewards[target_idx] += reward
+            self._total_steps += 1
+
+    def _select_target_ucb(
+        self,
+        rng: np.random.Generator,
+    ) -> int:
+        """Select target using Upper Confidence Bound (UCB1).
+
+        UCB1: ``x_bar_i + c * sqrt(ln(t) / n_i)``
+
+        Balances exploitation (high mean reward targets) with
+        exploration (under-visited targets).
+        """
+        if self._total_steps < self.n_targets:
+            # Visit each target at least once
+            unvisited = np.where(self._target_counts == 0)[0]
+            return int(rng.choice(unvisited))
+
+        mean_rewards = self._target_rewards / np.maximum(self._target_counts, 1)
+        exploration = self.ucb_c * np.sqrt(
+            np.log(self._total_steps + 1) / np.maximum(self._target_counts, 1)
+        )
+        ucb_scores = mean_rewards + exploration
+        return int(np.argmax(ucb_scores))
+
+    def _plan_molecule_cem(
+        self,
+        state: NDArray[np.floating],
+        target_idx: int,
+        target_embeddings: NDArray[np.floating] | None,
+        rng: np.random.Generator,
+    ) -> NDArray[np.floating]:
+        """CEM planning in GenMol’s latent space.
+
+        Generates candidate delta-z vectors and scores them using
+        the reward function.  Iteratively refines the distribution
+        toward high-reward regions.
+        """
+        if self.reward_fn is None:
+            return rng.standard_normal(self.latent_dim).astype(np.float32) * 0.3
+
+        mean = np.zeros(self.latent_dim, dtype=np.float32)
+        std = np.full(self.latent_dim, 0.3, dtype=np.float32)
+        n_elite = max(int(self.cem_samples * self.cem_elite_frac), 1)
+
+        for _ in range(self.cem_iterations):
+            samples = rng.normal(
+                loc=mean, scale=std,
+                size=(self.cem_samples, self.latent_dim),
+            ).astype(np.float32)
+            samples = np.clip(samples, -1.0, 1.0)
+
+            # Score each candidate
+            rewards = np.zeros(self.cem_samples, dtype=np.float32)
+            for j, dz in enumerate(samples):
+                # Build a candidate action
+                action = np.zeros(2 + self.latent_dim, dtype=np.float32)
+                action[0] = (2.0 * target_idx / max(self.n_targets - 1, 1)) - 1.0
+                action[1] = -1.0
+                action[2:] = dz
+                rewards[j] = self.reward_fn(state, action)
+
+            # Select elite
+            elite_idx = np.argsort(rewards)[-n_elite:]
+            elite = samples[elite_idx]
+            mean = elite.mean(axis=0)
+            std = elite.std(axis=0) + 1e-6
+
+        return mean

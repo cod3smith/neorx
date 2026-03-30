@@ -62,10 +62,20 @@ class _NeuralMechanism(nn.Module):
 class StructuralCausalModel:
     """A differentiable structural causal model fit to transition data.
 
+    Supports two modes:
+
+    1. **Toy-env mode** (original): nodes are ``s0, s1, a0, a1, …``,
+       graph is learned from ``(state, action, next_state)`` transitions.
+
+    2. **Disease-graph mode** (new): nodes are gene/protein/pathway IDs,
+       edges are typed (``api`` vs ``learned``), and the graph can be
+       augmented by merging API-derived and data-driven edges.
+
     Parameters
     ----------
     graph : nx.DiGraph
-        The causal graph.  Nodes should be named after state/action dims.
+        The causal graph.  Nodes should be named after state/action dims
+        (toy mode) or biological entity IDs (disease-graph mode).
     state_dim : int
         Number of state dimensions.
     action_dim : int
@@ -76,6 +86,10 @@ class StructuralCausalModel:
         Learning rate for mechanism fitting.
     epochs : int
         Training epochs.
+    edge_type_weights : dict[str, float] | None
+        Mapping ``evidence_type → weight_multiplier``.  E.g.
+        ``{"api": 1.0, "learned": 0.5}`` down-weights learned edges
+        during do-calculus propagation.  ``None`` → all edges equal.
     """
 
     def __init__(
@@ -87,6 +101,7 @@ class StructuralCausalModel:
         lr: float = 1e-3,
         epochs: int = 200,
         hidden: int = 32,
+        edge_type_weights: dict[str, float] | None = None,
     ) -> None:
         self.graph = graph
         self.state_dim = state_dim
@@ -96,6 +111,9 @@ class StructuralCausalModel:
         self.epochs = epochs
         self.hidden = hidden
         self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+
+        # Edge type weights for do-calculus propagation
+        self.edge_type_weights = edge_type_weights or {}
 
         # All node names: first state dims, then action dims
         self.all_names: list[str] = list(graph.nodes)
@@ -113,11 +131,12 @@ class StructuralCausalModel:
         name_to_idx = {n: i for i, n in enumerate(self.all_names)}
         for node in self.target_names:
             parents = list(self.graph.predecessors(node))
-            # Remove self-loops for mechanism input
-            parents_clean = [p for p in parents if p != node]
-            if not parents_clean:
-                parents_clean = [node]  # exogenous / root
-            pidx = [name_to_idx[p] for p in parents_clean if p in name_to_idx]
+            # Keep self-loops: in a time-series SCM, s0→s0 represents
+            # the autoregressive dependency (s0_t influences s0_{t+1}).
+            # Only fall back to [self] when there are NO parents at all.
+            if not parents:
+                parents = [node]
+            pidx = [name_to_idx[p] for p in parents if p in name_to_idx]
             if not pidx:
                 pidx = [name_to_idx[node]]
             self.parent_indices[node] = pidx
@@ -250,3 +269,105 @@ class StructuralCausalModel:
             for pname in parent_names:
                 strengths[(pname, node)] = weight_norm / len(parent_names)
         return strengths
+
+    # ------------------------------------------------------------------ #
+    #  Graph Augmentation                                                  #
+    # ------------------------------------------------------------------ #
+
+    def augment_graph(
+        self,
+        learned_edges: list[tuple[str, str, dict[str, object]]],
+        rebuild_mechanisms: bool = True,
+    ) -> int:
+        """Augment the SCM graph with data-driven (learned) edges.
+
+        Merges learned edges into the existing graph.  Each learned
+        edge is tagged with ``evidence_type="learned"`` to distinguish
+        it from API-derived edges.
+
+        Parameters
+        ----------
+        learned_edges : list of ``(source, target, attrs)``
+            New edges to add.  ``attrs`` should include at minimum
+            ``{"weight": float, "confidence": float}``.
+        rebuild_mechanisms : bool
+            If ``True``, rebuilds the SCM mechanisms after augmentation
+            to incorporate new parent sets.  Set to ``False`` if you
+            plan to call ``augment_graph`` multiple times before fitting.
+
+        Returns
+        -------
+        int
+            Number of new edges actually added (excluding duplicates).
+        """
+        added = 0
+        for src, tgt, attrs in learned_edges:
+            if not self.graph.has_edge(src, tgt):
+                edge_attrs = dict(attrs)
+                edge_attrs.setdefault("evidence_type", "learned")
+                edge_attrs.setdefault("weight", 0.5)
+                self.graph.add_edge(src, tgt, **edge_attrs)
+                added += 1
+            else:
+                # Edge exists — update confidence if learned score is higher
+                existing = self.graph.edges[src, tgt]
+                new_conf = attrs.get("confidence", 0.0)
+                old_conf = existing.get("confidence", 0.0)
+                if new_conf > old_conf:
+                    self.graph.edges[src, tgt].update(attrs)
+                    self.graph.edges[src, tgt]["evidence_type"] = "augmented"
+
+        if added > 0:
+            # Update node lists
+            self.all_names = list(self.graph.nodes)
+            if rebuild_mechanisms:
+                self._build_mechanisms()
+
+        return added
+
+    def get_edge_provenance(self) -> dict[str, list[tuple[str, str]]]:
+        """Return edges grouped by provenance type.
+
+        Returns
+        -------
+        dict mapping ``evidence_type → list of (source, target)`` tuples.
+        """
+        provenance: dict[str, list[tuple[str, str]]] = {}
+        for u, v, data in self.graph.edges(data=True):
+            etype = data.get("evidence_type", "unknown")
+            provenance.setdefault(etype, []).append((u, v))
+        return provenance
+
+    @classmethod
+    def from_disease_graph(
+        cls,
+        G: nx.DiGraph,
+        mechanism: Literal["linear", "neural"] = "neural",
+        edge_type_weights: dict[str, float] | None = None,
+    ) -> "StructuralCausalModel":
+        """Construct an SCM from a NeoRx disease graph.
+
+        In disease-graph mode, all nodes are treated as state
+        dimensions (no explicit action nodes).  The SCM can
+        then be used for counterfactual reasoning via ``do()``.
+
+        Parameters
+        ----------
+        G : nx.DiGraph
+            Disease knowledge graph.
+        mechanism : ``"linear"`` | ``"neural"``
+        edge_type_weights : dict | None
+            Per-edge-type weight multipliers.
+
+        Returns
+        -------
+        StructuralCausalModel
+        """
+        n_nodes = G.number_of_nodes()
+        return cls(
+            graph=G.copy(),
+            state_dim=n_nodes,
+            action_dim=0,
+            mechanism=mechanism,
+            edge_type_weights=edge_type_weights,
+        )
