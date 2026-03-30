@@ -91,7 +91,7 @@ class TestSCM:
         G.add_edge("a0", "s0")
         G.add_edge("s1", "s1")
         G.add_edge("a0", "s1")
-        return StructuralCausalModel(G, state_dim=2, action_dim=1, mechanism="linear", epochs=100)
+        return StructuralCausalModel(G, state_dim=2, action_dim=1, mechanism="linear", epochs=300, lr=1e-2)
 
     def test_fit_and_predict(self) -> None:
         scm = self._make_simple_scm()
