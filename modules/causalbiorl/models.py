@@ -7,7 +7,7 @@ from __future__ import annotations
 from typing import Literal
 
 import numpy as np
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, ConfigDict, Field
 
 
 class EnvConfig(BaseModel):
@@ -39,6 +39,8 @@ class BenchmarkConfig(BaseModel):
 class EpisodeResult(BaseModel):
     """Result of a single training run."""
 
+    model_config = ConfigDict(arbitrary_types_allowed=True)
+
     env_id: str
     agent_type: str
     seed: int
@@ -46,12 +48,11 @@ class EpisodeResult(BaseModel):
     episode_lengths: list[int]
     total_steps: int
 
-    class Config:
-        arbitrary_types_allowed = True
-
 
 class BenchmarkResult(BaseModel):
     """Aggregated results of a benchmark experiment."""
+
+    model_config = ConfigDict(arbitrary_types_allowed=True)
 
     env_id: str
     agent_type: str
@@ -61,9 +62,6 @@ class BenchmarkResult(BaseModel):
     std_total_steps: float
     per_seed: list[EpisodeResult] = Field(default_factory=list)
 
-    class Config:
-        arbitrary_types_allowed = True
-
 
 class TrainConfig(BaseModel):
     """CLI training configuration."""
@@ -72,5 +70,25 @@ class TrainConfig(BaseModel):
     agent: Literal["causal", "ppo", "sac", "random"] = "causal"
     episodes: int = 500
     difficulty: Literal["easy", "medium", "hard"] = "medium"
+    seed: int | None = None
+    output_dir: str = "results"
+
+
+class DrugDiscoveryConfig(BaseModel):
+    """Configuration for the DrugDiscovery-v0 environment.
+
+    Extends the standard env config with drug-discovery-specific
+    parameters: disease name, target budget, surrogate usage, etc.
+    """
+
+    disease: str = Field("Malaria", description="Disease to target")
+    top_n_targets: int = Field(5, ge=1, le=10, description="Max causal targets")
+    max_steps: int = Field(50, ge=10, description="Generate-screen budget per episode")
+    latent_dim: int = Field(128, description="GenMol latent space dimension")
+    use_surrogate: bool = Field(True, description="Use surrogate docking (fast) vs real DockBot")
+    recalibrate_interval: int = Field(10, ge=1, description="Recalibrate surrogate every N steps")
+    difficulty: Literal["easy", "medium", "hard"] = "medium"
+    agent: Literal["causal", "ppo", "sac", "random"] = "causal"
+    n_episodes: int = Field(100, ge=1, description="Training episodes")
     seed: int | None = None
     output_dir: str = "results"

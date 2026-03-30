@@ -29,6 +29,8 @@ from modules.causalbiorl.viz import plot_sample_efficiency, plot_trajectories
 
 # Environment IDs
 ALL_ENVS = ["GeneticToggle-v0", "MetabolicPathway-v0", "CellGrowth-v0"]
+# Drug discovery env requires disease graph — run separately
+DRUG_DISCOVERY_ENV = "DrugDiscovery-v0"
 ALL_AGENTS: list[str] = ["causal", "ppo", "sac", "random"]
 
 
