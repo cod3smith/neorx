@@ -22,6 +22,7 @@ from .reactome import query_reactome_pathways
 from .string_db import query_string_interactions
 from .uniprot import query_uniprot
 from .pdb import query_pdb_structures
+from .chembl import query_chembl
 
 __all__ = [
     "query_monarch",
@@ -31,4 +32,5 @@ __all__ = [
     "query_string_interactions",
     "query_uniprot",
     "query_pdb_structures",
+    "query_chembl",
 ]

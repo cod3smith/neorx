@@ -88,6 +88,9 @@ def query_open_targets(
                     id
                     source
                   }
+                  associatedDiseases {
+                    count
+                  }
                 }
                 score
                 datatypeScores {
@@ -147,6 +150,14 @@ def query_open_targets(
             # Datatype breakdown
             dt_scores = {dt["id"]: dt["score"] for dt in row.get("datatypeScores", [])}
 
+            # Disease specificity — how many diseases is this gene
+            # associated with?  Hub genes (TP53, AKT1) are linked to
+            # thousands; specific targets to few.  We use this for a
+            # specificity penalty in causal confidence scoring.
+            n_assoc_diseases = (
+                target.get("associatedDiseases", {}).get("count", 0)
+            )
+
             node = GraphNode(
                 node_id=node_id,
                 name=gene_symbol,
@@ -159,6 +170,7 @@ def query_open_targets(
                     "ensembl_id": ensembl_id,
                     "datatype_scores": dt_scores,
                     "has_known_drug": dt_scores.get("known_drug", 0) > 0,
+                    "n_associated_diseases": n_assoc_diseases,
                 },
             )
             nodes.append(node)
