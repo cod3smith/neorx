@@ -28,7 +28,7 @@ logger = logging.getLogger(__name__)
 
 app = FastAPI(
     title="GenMol API",
-    description="Generative molecular design with VAE — NeoForge CausalTarget",
+    description="Generative molecular design with VAE — NeoForge NeoRx",
     version="0.1.0",
 )
 
