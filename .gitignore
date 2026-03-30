@@ -8,3 +8,47 @@ wheels/
 
 # Virtual environments
 .venv
+
+# Environment files (not .env.example)
+.env
+.env.local
+.env.production
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Test / coverage
+.pytest_cache/
+htmlcov/
+.coverage
+.coverage.*
+coverage.xml
+
+# Generated outputs
+reports/
+results/
+
+# Molecular data caches
+modules/dockbot/cache/
+*.pdb
+*.pdbqt
+*.sdf
+*.mol2
+
+# Jupyter
+.ipynb_checkpoints/
+
+# Model weights (too large for git)
+*.pt
+*.pth
+*.h5
+*.pkl
+*.ckpt
