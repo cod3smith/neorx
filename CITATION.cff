@@ -1,0 +1,45 @@
+cff-version: 1.2.0
+title: "NeoRx: Causal Inference for Automated Drug Target Identification"
+message: "If you use this software, please cite it as below."
+type: software
+version: 0.1.0
+date-released: "2026-03-31"
+license: LicenseRef-NeoRx-NonCommercial
+repository-code: "https://github.com/cod3smith/neorx"
+url: "https://github.com/cod3smith/neorx"
+abstract: >-
+  NeoRx is an end-to-end computational platform that applies Pearl's causal
+  inference framework to multi-source biomedical knowledge graphs for drug
+  target identification. It integrates eight databases (Monarch Initiative,
+  Open Targets, KEGG, Reactome, STRING, UniProt, PDB, ChEMBL), applies
+  backdoor criterion analysis and sensitivity testing, and includes a
+  biological intelligence layer, molecule generation (GenMol VAE), and
+  virtual screening. Validated across seven diseases with mean F1 = 0.474.
+keywords:
+  - causal inference
+  - drug discovery
+  - do-calculus
+  - knowledge graphs
+  - target identification
+  - reinforcement learning
+  - molecular generation
+  - variational autoencoder
+  - bioinformatics
+  - cheminformatics
+authors:
+  - given-names: Kelyn Paul
+    family-names: Njeri
+    email: kelyn@neoforgelabs.tech
+    affiliation: "NeoForge Labs"
+    orcid: "https://orcid.org/0009-0000-1068-4512"
+preferred-citation:
+  type: article
+  title: "NeoRx: Causal Inference for Automated Drug Target Identification via Pearl's Do-Calculus over Multi-Source Biomedical Knowledge Graphs"
+  authors:
+    - given-names: Kelyn Paul
+      family-names: Njeri
+      email: kelyn@neoforgelabs.tech
+      affiliation: "NeoForge Labs"
+      orcid: "https://orcid.org/0009-0000-1068-4512"
+  year: 2026
+  url: "https://github.com/cod3smith/neorx"

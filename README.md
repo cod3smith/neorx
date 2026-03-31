@@ -3,16 +3,17 @@
 > *"Correlation is not causation — NeoRx knows the difference."*
 
 [![Python 3.13+](https://img.shields.io/badge/python-3.13%2B-blue.svg)](https://python.org)
-[![Tests](https://img.shields.io/badge/tests-371%20passing-brightgreen.svg)]()
-[![License](https://img.shields.io/badge/license-MIT-green.svg)]()
+[![License](https://img.shields.io/badge/license-Non--Commercial-orange.svg)](LICENSE)
 
-**NeoRx** is an AI-driven drug target discovery pipeline that applies
-**Pearl's causal inference framework** to distinguish genuine causal drug
-targets from correlational bystanders.  Unlike conventional association-based
-pipelines, NeoRx asks:
+**NeoRx** is an end-to-end computational platform that applies
+**Pearl's causal inference framework** to multi-source biomedical knowledge
+graphs for automated drug target identification. Unlike conventional
+association-based pipelines, NeoRx asks:
 
 > *"If we intervene on this protein (inhibit or activate it with a drug),
 > does it causally affect the disease outcome?"*
+
+Validated across **7 diseases** (HIV, malaria, Alzheimer's, Ebola, type 2 diabetes, lung cancer, breast cancer) with **mean F₁ = 0.474** and **zero false positives** across all diseases.
 
 ## The Problem
 
@@ -31,15 +32,15 @@ NeoRx distinguishes these two cases automatically.
 
 ```
 ┌─────────────────┐     ┌──────────────────┐     ┌─────────────────┐
-│  7 Biomedical   │────▶│  Causal Knowledge │────▶│  Do-Calculus     │
+│  8 Biomedical   │────▶│  Causal Knowledge │────▶│  Do-Calculus     │
 │  Databases      │     │  Graph (NetworkX) │     │  Analysis        │
 │  Monarch Init.  │     │                  │     │  • Backdoor      │
 │  Open Targets   │     │  Genes, Pathways, │     │  • d-Separation  │
 │  KEGG, Reactome │     │  PPIs, Structures │     │  • Sensitivity   │
-│  STRING, UniProt│     │                  │     │                 │
+│  STRING, UniProt│     │  Drug evidence    │     │  • Bootstrap CIs │
 │  RCSB PDB       │     └──────────────────┘     └────────┬────────┘
-└─────────────────┘                                       │
-                                                          ▼
+│  ChEMBL v36     │                                       │
+└─────────────────┘                                       ▼
 ┌─────────────────┐     ┌──────────────────┐     ┌─────────────────┐
 │  HTML Report    │◀────│  Composite Scorer │◀────│  GenMol +        │
 │  Interactive    │     │  6D Ranking:      │     │  MolScreen +     │
@@ -47,23 +48,33 @@ NeoRx distinguishes these two cases automatically.
 └─────────────────┘     └──────────────────┘     └─────────────────┘
 ```
 
-### Six-Step Workflow
+### Seven-Stage Workflow
 
-1. **Build Causal Knowledge Graph** — Query 7 biomedical databases in
-   parallel, merge into a unified directed graph.
+1. **Build Causal Knowledge Graph** — Query 8 biomedical databases in
+   parallel (Monarch, Open Targets, KEGG, Reactome, STRING, UniProt, PDB,
+   ChEMBL), merge into a unified directed graph with automatic node
+   merging and edge provenance tracking.
 
 2. **Identify Causal Targets** — Apply the backdoor criterion and
    d-separation analysis to distinguish causal from correlational targets.
-   Multi-source evidence triangulation and leave-one-source-out sensitivity
-   analysis for robustness.
+   Multi-source evidence triangulation, leave-one-source-out sensitivity
+   analysis, and bootstrap confidence intervals for robustness.
+   A dedicated **pathogen target pipeline** identifies non-human drug
+   targets (e.g., *Plasmodium* DHFR-TS, HIV Pol) from ChEMBL.
 
-3. **Generate Candidate Molecules** — GenMol variational autoencoder
-   generates novel drug-like molecules targeting each causal protein.
+3. **Biological Intelligence** — Disease-type-aware target classifier
+   (9 gene families, 119+ blocklisted symptom markers) and tissue
+   expression boolean gate (Human Protein Atlas) prevent biologically
+   implausible targets from advancing.
 
-4. **Screen Candidates** — MolScreen evaluates drug-likeness (Lipinski,
+4. **Generate Candidate Molecules** — GenMol variational autoencoder
+   (~4.1M parameters, 97% validity) generates novel drug-like molecules
+   targeting each causal protein.
+
+5. **Screen Candidates** — MolScreen evaluates drug-likeness (Lipinski,
    QED, SA) and DockBot estimates binding affinity via AutoDock Vina.
 
-5. **Score & Rank** — Composite scorer integrates six dimensions with
+6. **Score & Rank** — Composite scorer integrates six dimensions with
    **causal confidence weighted highest** (0.30):
 
    | Dimension           | Weight |
@@ -75,7 +86,7 @@ NeoRx distinguishes these two cases automatically.
    | ADMET               | 0.10   |
    | Novelty             | 0.10   |
 
-6. **Report** — Interactive HTML report with causal knowledge graph
+7. **Report** — Interactive HTML report with causal knowledge graph
    visualisation, target reasoning, and ranked candidate table.
 
 ### RL-Driven Mode (CausalBioRL)
@@ -110,13 +121,13 @@ result = run_rl_pipeline("HIV", n_episodes=20, top_n_targets=5)
 pip install neorx
 
 # From source with uv
-git clone https://github.com/NeoForge/NeoRx.git
-cd NeoRx
+git clone https://github.com/cod3smith/neorx.git
+cd neorx
 uv sync
 
 # From source with pip
-git clone https://github.com/NeoForge/NeoRx.git
-cd NeoRx
+git clone https://github.com/cod3smith/neorx.git
+cd neorx
 pip install -e .
 ```
 
@@ -201,17 +212,20 @@ curl -X POST http://localhost:8000/identify \
 
 ## Data Sources
 
-| Database     | Data Type                | API Style    | Caching |
-|--------------|--------------------------|--------------|---------|
-| Monarch Init.| Gene–disease associations| REST (v3)    | ✅ 24h   |
-| Open Targets | Target–disease evidence  | GraphQL      | ✅ 24h   |
-| KEGG         | Pathway membership       | REST         | ✅ 24h   |
-| Reactome     | Pathway membership       | REST         | ✅ 24h   |
-| STRING       | Protein–protein interactions| REST (batch)| ✅ 24h   |
-| UniProt      | Protein metadata         | REST         | ✅ 24h   |
-| RCSB PDB     | 3D structures            | REST/Search  | ✅ 24h   |
+| Database     | Data Type                   | API Style       | Caching |
+|--------------|-----------------------------|-----------------|---------|
+| Monarch Init.| Gene–disease associations   | REST (v3)       | ✅ 24h   |
+| Open Targets | Target–disease evidence     | GraphQL         | ✅ 24h   |
+| KEGG         | Pathway membership          | REST            | ✅ 24h   |
+| Reactome     | Pathway membership          | REST            | ✅ 24h   |
+| STRING       | Protein–protein interactions| REST (batch)    | ✅ 24h   |
+| UniProt      | Protein metadata            | REST            | ✅ 24h   |
+| RCSB PDB     | 3D structures               | REST/Search     | ✅ 24h   |
+| ChEMBL v36   | Drug–target relationships   | Local SQLite    | ✅ local |
 
-All clients include curated mock fallback data for offline use and testing.
+All REST clients include curated mock fallback data for offline use and testing.
+ChEMBL queries run against a local SQLite copy (28 GB) for pathogen target
+identification and drug evidence scoring.
 
 ## Methodology
 
@@ -272,7 +286,7 @@ for querying and sharing across sessions.
 NeoRx/
 ├── main.py                     # Entry point
 ├── pyproject.toml              # Dependencies, build config & CLI scripts
-├── LICENSE                     # MIT License
+├── LICENSE                     # Source Available (Non-Commercial)
 ├── CONTRIBUTING.md             # Contributor guide
 ├── CODE_OF_CONDUCT.md          # Community standards
 ├── SECURITY.md                 # Vulnerability reporting
@@ -283,16 +297,16 @@ NeoRx/
 ├── neorx/               # Public re-export package (pip install)
 │   └── __init__.py             # `from neorx import run_pipeline`
 │
-├── modules/neorx/      # Orchestration module
+├── modules/neorx/              # Orchestration module
 │   ├── models.py               # Pydantic data models
 │   ├── graph_builder.py        # Parallel multi-source graph assembly
 │   ├── identifier.py           # Causal inference (d-separation, triangulation)
 │   ├── scorer.py               # 6D composite scoring
 │   ├── pipeline.py             # Linear + RL-driven orchestration
 │   ├── report.py               # Interactive HTML reports
-│   ├── classifier.py           # Target type classification
-│   ├── validator.py            # Known-target validation
-│   ├── tissue_filter.py        # Tissue expression filtering
+│   ├── classifier.py           # Disease-type-aware target classification
+│   ├── validator.py            # Known-target validation (7 diseases)
+│   ├── tissue_filter.py        # HPA tissue expression boolean gate
 │   ├── counterfactual.py       # Counterfactual validation + BioRL bridge
 │   ├── literature_validator.py # Literature evidence lookup
 │   ├── api.py                  # FastAPI REST service
@@ -300,7 +314,15 @@ NeoRx/
 │   ├── persistence.py          # Graph save/load/export
 │   ├── admet.py                # Multi-rule ADMET prediction
 │   ├── __main__.py             # Typer CLI
-│   ├── data_sources/           # 7 biomedical database clients
+│   ├── data_sources/           # 8 biomedical database clients
+│   │   ├── monarch.py          #   Monarch Initiative (REST v3)
+│   │   ├── open_targets.py     #   Open Targets (GraphQL)
+│   │   ├── kegg.py             #   KEGG pathways
+│   │   ├── reactome.py         #   Reactome pathways
+│   │   ├── string_db.py        #   STRING PPIs
+│   │   ├── uniprot.py          #   UniProt metadata
+│   │   ├── pdb.py              #   RCSB PDB structures
+│   │   └── chembl.py           #   ChEMBL v36 (local SQLite)
 │   └── tests/
 │
 ├── modules/causalbiorl/        # Causal reinforcement learning
@@ -309,16 +331,24 @@ NeoRx/
 │   ├── causal/                 # SCM, planner, graph encoder, reward learner
 │   └── tests/
 │
-├── modules/genmol/             # Molecular generation (VAE)
+├── modules/genmol/             # Molecular generation (VAE, ~4.1M params)
 ├── modules/molscreen/          # Drug-likeness screening
 ├── modules/dockbot/            # Molecular docking (Vina)
-└── modules/mirrorfold/         # Protein structure prediction
+├── modules/mirrorfold/         # Protein structure prediction
+│
+├── papers/                     # Research papers (Markdown source)
+│   ├── latex/                  # Generated LaTeX + PDF outputs
+│   └── convert_to_latex.py     # Markdown → arXiv-ready LaTeX/PDF
+│
+├── figures/                    # Publication figures (PNG + PDF)
+├── checkpoints/                # Trained model checkpoints
+└── results/                    # Benchmark results (JSON)
 ```
 
 ## Testing
 
 ```bash
-# Run all tests (371 tests)
+# Run all tests
 uv run python -m pytest modules/ -q
 
 # Run a specific module's tests
@@ -362,19 +392,50 @@ custom_weights = {
 }
 ```
 
+## Research Papers
+
+NeoRx is described across four companion papers:
+
+1. **NeoRx** — Causal Inference for Automated Drug Target Identification via Pearl's Do-Calculus over Multi-Source Biomedical Knowledge Graphs
+2. **CausalBioRL** — Reinforcement Learning with Causal World Models for Autonomous Drug Discovery
+3. **Biological Intelligence** — Disease-Type-Aware Biological Intelligence Layers for Preventing Symptom Marker False Positives
+4. **GenMol** — A Lightweight Variational Autoencoder for Target-Aware Drug-Like Molecule Generation
+
+PDFs and LaTeX sources are in [`papers/latex/`](papers/latex/).
+
+## Validation Results
+
+| Disease | Precision | Recall | F₁ | Grade |
+|---------|-----------|--------|----|-------|
+| HIV | 0.429 | 0.750 | 0.545 | B |
+| Malaria | 0.400 | 0.286 | 0.333 | C |
+| Type 2 Diabetes | 0.417 | 0.833 | 0.556 | B |
+| Alzheimer's | 0.333 | 0.400 | 0.364 | C |
+| Lung Cancer | 0.538 | 1.000 | 0.700 | A |
+| Breast Cancer | 0.308 | 0.667 | 0.421 | B |
+| Ebola | 0.333 | 0.500 | 0.400 | C |
+| **Mean** | **0.394** | **0.634** | **0.474** | — |
+
+Zero known false positives promoted to CAUSAL across all 7 diseases.
+NeoRx outperforms a correlation-only baseline in 6 of 7 diseases (+80% mean F₁ improvement).
+
 ## Citation
 
 If you use NeoRx in your research, please cite:
 
 ```bibtex
 @software{neorx2026,
-  title  = {NeoRx: Causal Drug Target Discovery via Do-Calculus},
+  title  = {NeoRx: Causal Drug Target Discovery via Pearl's Do-Calculus},
   author = {Njeri, Kelyn Paul},
   year   = {2026},
-  url    = {https://github.com/NeoForge/NeoRx}
+  url    = {https://github.com/cod3smith/neorx}
 }
 ```
 
+## Author
+
+**Kelyn Paul Njeri** · [NeoForge Labs](mailto:kelyn@neoforgelabs.tech) · [ORCID 0009-0000-1068-4512](https://orcid.org/0009-0000-1068-4512)
+
 ## License
 
-MIT
+Source Available — Non-Commercial. Free for personal, academic, and research use. Commercial use requires a separate licence. See [LICENSE](LICENSE) for details. Contact kelyn@neoforgelabs.tech for commercial licensing.

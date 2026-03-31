@@ -52,3 +52,6 @@ modules/dockbot/cache/
 *.h5
 *.pkl
 *.ckpt
+
+# ChEMBL SQLite database (28 GB — too large for git)
+chembl_*.db

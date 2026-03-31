@@ -135,4 +135,4 @@ not just the solution.
 ## License
 
 By contributing, you agree that your contributions will be licensed
-under the MIT License.
+under the NeoRx Source Available (Non-Commercial) License.
