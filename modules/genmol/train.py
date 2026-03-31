@@ -158,7 +158,6 @@ def train_vae(
         mode="min",
         factor=config.lr_factor,
         patience=config.patience,
-        verbose=True,
     )
 
     # Mixed precision
